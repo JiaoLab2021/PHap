@@ -1,5 +1,5 @@
 # PHap
-A haplotype sequence assembly pipeline (PHap) tailored for autopolyploids, relying solely on common sequencing data including long-reads and Hi-C.
+A haplotype-resolved and telomere-to-telomere genome assembly pipeline (PHap) tailored for autopolyploids, relying solely on common sequencing data including long-reads and Hi-C.
 ## Overview
 ![|600](https://bioin-1320274504.cos.ap-nanjing.myqcloud.com/images/PHAP.overview.v3.png)
 1. **Initial assembly.** A primary contig assembly (*p_ctg*) and a phased unitig assembly (*p_utg*) are assembled using hifiasm with the long-read sequencing data including PacBio HiFi and Oxford Nanopore Ultra-Long sequencings. 
@@ -70,9 +70,9 @@ usage: Haplotype assembly and scaffolding of autopolyploid genome.
 ```
 * For convenience, users can add `/path/to/PHap/PHap.py` to environment variables, such as: `ln -s /path/to/PHap/PHap.py ~/.local/bin/phap`, and then the `phap`command can be executed directly from any location in the terminal.
 
-## Pipeline of assembling tetraploid potato
-check [Pipeline](Pipeline.md).
+## The pipeline for assembling a tetraploid potato genome
+Please check the [Pipeline](Pipeline.md).
 
-## Future plans
-**PHap** was developed to facilitate _haplotype-resolved telomere-to-telomere (T2T) genome assembly_ in **autotetraploid genomes**, with a primary focus on crops such as potato (_Solanum tuberosum_). 
-In future releases, **PHap will be extended to support other polyploid genome types**, including **triploid**, **hexaploid**, and more complex genomes.
+## Note
+**PHap** is currently developed to do _haplotype-resolved telomere-to-telomere (T2T) genome assembly_ in **autotetraploid genomes**, with a primary focus on crops such as potato (_Solanum tuberosum_). 
+Theoretically, **PHap can be easily extended to support other polyploid genome types**, including **triploid**, **hexaploid**, and more complex genomes.
