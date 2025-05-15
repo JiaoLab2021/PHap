@@ -25,7 +25,7 @@ import subprocess
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Haplotype assembly and scaffolding of autopolyploid genome")
+    parser = argparse.ArgumentParser("Haplotype assembly and scaffolding of autopolyploid genome.")
     parser.add_argument('--bam_hifi', type=str, required=True, help='Path to HiFi bam file')
     parser.add_argument('--bam_hic', type=str, required=True, help='Path to Hi-C bam file')
     parser.add_argument('--bam_ont', type=str, required=True, help='Path to ONT bam file')

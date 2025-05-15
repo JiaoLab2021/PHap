@@ -13,12 +13,15 @@ import subprocess
 import sys
 
 # Constants
-__version__ = "1.0.0"
-__update_time__ = "2024-08-08"
+# __version__ = "1.0.0"
+# __update_time__ = "2024-08-08"
+
+__version__ = "1.1.0"
+__update_time__ = "2025-04-22"
 
 
 HELP_DOC = """
-  Usage: t2tpoly [command] <parameters>
+  Usage: phap [command] <parameters>
   
   Command       Description
   --------      ------------------------------------------------------------------------
@@ -34,7 +37,7 @@ HELP_DOC = """
   phase_reads   Based on the clustering results, the corresponding reads of each haplotype
                 are extracted, then assembled and anchored separately.
 
-  Use t2tpoly [command] --help/-h to see detailed help for each individual command.
+  Use phap [command] --help/-h to see detailed help for each individual command.
   """
 
 
@@ -84,10 +87,10 @@ def main():
 
     # Map each function to its corresponding script
     params = {
-        'mt2t': 't2tpoly_mT2T.py',
-        'cluster': 't2tpoly_cluster.py',
-        'phase_reads': 't2tpoly_phase_reads.py',
-        'fill_gap': 't2tpoly_fill_gaps.py'
+        'mt2t': 'phap_mT2T.py',
+        'cluster': 'phap_cluster.py',
+        'phase_reads': 'phap_phase_reads.py',
+        'fill_gap': 'phap_fill_gaps.py'
     }
 
     if len(sys.argv) > 1 and sys.argv[1] in params:

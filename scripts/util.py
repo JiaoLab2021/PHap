@@ -7,6 +7,7 @@ import time
 import pandas as pd
 from collections import defaultdict
 import re
+from scipy.stats import linregress
 
 ### 制作文件夹，先判断文件夹是否存在？
 def mkdir(dir):
@@ -442,23 +443,34 @@ def find_identity_contig_pair(file_paf):
 
 
 def remove_redundancy(merge_paf, wd, dic_contig, args):
-    def get_contig_pair(contig1, contig2, len_contig1, len_contig2):
-        ''' contig pair based on contig length '''
-        if len_contig1 > len_contig2:
+    def get_contig_pair(contig1, contig2, len1, len2, start1, start2):
+        ''' contig pair based on contig length, Return (longer_contig, shorter_contig) '''
+        if len1 > len2:
             return (contig1, contig2)
         else:
             return (contig2, contig1)
+
+    def get_contig_coord(len1, len2, start1, start2):
+        ''' contig coord based on contig length, Return (longer_contig start, shorter_contig start) '''
+        if len1 > len2:
+            return (start1, start2)
+        else:
+            return (start2, start1)
 
     def filter_paf(file_paf, file_paf_filter, length_alignment, length_query):
         ''' filter PAF '''
         cigar_pattern = re.compile(r'(\d+)([A-Z])')
 
+        # Dictionary to store contig pair statistics
         dic_paf_info = defaultdict(lambda: [0, 0, 0, 0, 0.00, 0.00])
-        processed_contig_pair = set()
+        # Dictionary to store alignment coordinates for R² calculation
+        coord_dict = defaultdict(list)
+
+        # processed_contig_pair = set()
         for lines in open(file_paf, 'r'):
             line = lines.strip().split()
 
-            # 跳过次要比对
+            ## jumping supplementary alignment
             if line[16][-1] == 'S':
                 continue
 
@@ -472,42 +484,97 @@ def remove_redundancy(merge_paf, wd, dic_contig, args):
             matches = cigar_pattern.findall(cigar)
             match_count = sum(int(length) for length, op in matches if op == 'M')
 
+            # time: 2025-04-23 22:20:36 -- match count 可能太严谨了，造成Haplotype之间的比对率特别低，大概只有13-15%，这时候在去除冗余的时候，阈值太高，则会过多保留；阈值太低，则会过多去除。
+            #   可以尝试使用paf 文件第十列和十一列的信息来计算。
+            #   尝试之后，没有太大区别
+            match_count = int(line[9])
+
             ## contig pair
-            contig_pair = get_contig_pair(line[0], line[5], int(line[1]), int(line[6]))
-            dic_paf_info[contig_pair][0] = int(line[1])     # # ctg1_len, ctg2_len, +=match_count, +=match_count
-            dic_paf_info[contig_pair][1] = int(line[6])
+            qname, tname = line[0], line[5]
+            qlen, tlen = int(line[1]), int(line[6])
+            qstart, tstart = int(line[2]), int(line[7])
+
+            contig_pair = get_contig_pair(qname, tname, qlen, tlen, qstart, tstart)     # contig_pair：（long contig, short contig）
+
+            if int(line[9]) > 5000:
+                coord_pair = get_contig_coord(qlen, tlen, qstart, tstart)
+
+                # Record coordinates for R² evaluation
+                coord_dict[contig_pair].append(coord_pair)
+
+            dic_paf_info[contig_pair][0] = max(qlen, tlen)     # dic_paf_info: key: (long ctg, short ctg); value: [long len, short len, long match count, short match count, long match ratio, short match ratio]
+            dic_paf_info[contig_pair][1] = min(qlen, tlen)
+
             dic_paf_info[contig_pair][2] += match_count
             dic_paf_info[contig_pair][3] += match_count
-            dic_paf_info[contig_pair][4] = dic_paf_info[contig_pair][2] / dic_paf_info[contig_pair][0]      # ctg1 match ratio
-            dic_paf_info[contig_pair][5] = dic_paf_info[contig_pair][3] / dic_paf_info[contig_pair][1]      # ctg2 match ratio
-        return dic_paf_info
+        for pair, values in dic_paf_info.items():
+            values[4] = values[2] / values[0] if values[0] else 0.0
+            values[5] = values[3] / values[1] if values[1] else 0.0
+            # dic_paf_info[contig_pair][4] = dic_paf_info[contig_pair][2] / dic_paf_info[contig_pair][0]      # ctg1 match ratio / long conitg
+            # dic_paf_info[contig_pair][5] = dic_paf_info[contig_pair][3] / dic_paf_info[contig_pair][1]      # ctg2 match ratio / short contig
+        return dic_paf_info, coord_dict
 
-    ## filter paf
+    def compute_r2(coord_dict, threshold=0.85):
+        """Compute R² (collinearity) for each contig pair"""
+        r2_flag = {}
+        for pair, coords in coord_dict.items():
+            if len(coords) < 2:
+                r2_flag[pair] = False
+                continue
+            qstarts, tstarts = zip(*coords)
+            # print(pair, coords)
+            r_squared = linregress(qstarts, tstarts).rvalue ** 2
+            print(pair, coords, r_squared)
+            r2_flag[pair] = r_squared >= threshold
+        return r2_flag
+
+    ### step1: parse PAF and calculate match ratios and coordinate data
     file_paf_filter = os.path.join(wd, 'merge.filter.paf')
-    dic_paf_info = filter_paf(merge_paf, file_paf_filter, args.min_alginment_length, args.min_contig_length)
+    dic_paf_info, coord_dict = filter_paf(merge_paf, file_paf_filter, args.min_alignment_length, args.min_contig_length)
 
-    ## debug
+    ### step2: compute collinearity (R²) for each contig pair
+    # r2_result = compute_r2(coord_dict, threshold=args.r2_threshold)
+    r2_result = compute_r2(coord_dict, threshold=args.r2_threshold)
+
+    ### step3: write debug info
     with open(os.path.join(wd, 'removed_contigs_match.ratio.txt'), 'w') as f:
         for key, values in dic_paf_info.items():
+            r2_status = r2_result.get(key, False)
             str_values = "\t".join(map(str, values))
-            f.write(f'{key}"\t"{str_values}"\n"')
+            f.write(f'{key[0]}\t{key[1]}\t{str_values}\tR2_pass={r2_status}\n')
+            # f.write(f'{key}"\t"{str_values}"\n"')
 
-    ## Remove redundancy
+    ### step4: determine which contigs to remove
     remove_contig = set()
     # processed_contig = set()      # 存储处理过的 contig -- 目的：对于 contig1-contig2，如果 contig1 已经被移除，那么对于 contig1-contig3，contig3 较短，这时候按照规则需要去除 contig3，但是 contig1 已经去除，contig3 需要保留。
-    for contg_pair, values in dic_paf_info.items():
-        if values[4] > args.match_ratio or values[5] > args.match_ratio:
-            contig_long = contg_pair[0]     # 长的 contig
-            contig_short = contg_pair[1]    # 短的 contig
-            if contig_short not in remove_contig:
-                # if contig_long not in remove_contig:
-                    remove_contig.add(contig_short)     # 需要提升：一个长的对应多个短的
+    for contig_pair, values in dic_paf_info.items():
+        match_ratio_pass = values[4] > args.match_ratio or values[5] > args.match_ratio
+        collinear_pass = r2_result.get(contig_pair, False)
+        if contig_pair[1] not in remove_contig:
+            if match_ratio_pass and collinear_pass:
+                contig_short = contig_pair[1]
+                remove_contig.add(contig_short)
 
-    ## output: output removed.fa and retained.fa
+    ### Step 5: write output FASTA files
     with open(f'{wd}/removed.fa', 'w') as out_remove, open(f'{wd}/retained.fa', 'w') as out_retain:
         for id, seq in dic_contig.items():
-            if len(seq) > 1000000:
+            # if len(seq) >= args.min_contig_length:
+            if len(seq) >= args.min_chr_length:
                 output = out_remove if id in remove_contig else out_retain
                 output.write(f'>{id}\n{seq}\n')
+
+        # if values[4] > args.match_ratio or values[5] > args.match_ratio:
+        #     contig_long = contg_pair[0]     # 长的 contig
+        #     contig_short = contg_pair[1]    # 短的 contig
+        #     if contig_short not in remove_contig:
+        #         # if contig_long not in remove_contig:
+        #             remove_contig.add(contig_short)     # 需要提升：一个长的对应多个短的
+    #
+    # ## output: output removed.fa and retained.fa
+    # with open(f'{wd}/removed.fa', 'w') as out_remove, open(f'{wd}/retained.fa', 'w') as out_retain:
+    #     for id, seq in dic_contig.items():
+    #         if len(seq) > 1000000:
+    #             output = out_remove if id in remove_contig else out_retain
+    #             output.write(f'>{id}\n{seq}\n')
 
     return None

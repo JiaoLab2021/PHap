@@ -42,7 +42,14 @@ author: pxxiao
 version7.0.v2
 description: 进行优化
     1. 增加 flank or full 模式选择参数，如果是 flank，则 RE 酶切位点个数为两端 flank 区域的 RE 个数，而不是全长的个数。
+---
+
+To do:
+    1. 有的多倍体基因组不需要 collapsed 恢复，但是其他挂载软件，例如：HapHiC 又不能解决这些基因组的挂载问题。
+        这时候需要添加一个参数，跳过 collapsed 的步骤。
+
 '''
+
 
 
 import argparse
@@ -706,7 +713,7 @@ def cluster(fasta, full_links, flank, contig_type, allelic_table_file, wd):
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Haplotype clustering of autopolyploid genome")
+    parser = argparse.ArgumentParser("Haplotype clustering of autopolyploid genome.")
 
     parser.add_argument('--p_utg', required=True, type=str, help='Path to p_utg file')
     parser.add_argument('--mT2T', required=True, type=str, help='Path to mT2T file or reference genome')

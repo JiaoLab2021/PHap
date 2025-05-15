@@ -18,6 +18,11 @@ description:
         ③ 计算 query 的比对率：match length / query length * 100，大于 ？ 则认为是冗余的序列，可以考虑去除
     4. 数据结构：(contig1, contig2): [contig1 length, contig2 length, contig1 match length, contig2 match length, match ratio]
 ----
+time: 2025-04-23
+author: pxxiao
+version: 3.0
+description:
+    fix bugs: remove_redundancy()
 '''
 
 
@@ -26,19 +31,23 @@ from util import *
 
 
 def parse_args():
-    parser = argparse.ArgumentParser('Get consensus sequences from many contig sequences.')
+    parser = argparse.ArgumentParser('Get mosaic T2T (mT2T) reference from primary contig assembly (p_ctg).')
     # Parameters for mT2T
-    mT2T = parser.add_argument_group('>>> Mosaic genome preliminary sequences')
+    mT2T = parser.add_argument_group('>>> mT2T reference')
     mT2T.add_argument('--p_ctg', required=True,
                                         help='path to p_ctg file')
     mT2T.add_argument('--min_distance', required=False, type=float, default=0.15,
                                         help='minimum distance between two contigs [0.15]')
-    mT2T.add_argument('--match_ratio', required=False, type=float, default=0.2,
-                                        help='match ratio between contigs [0.2]')
+    mT2T.add_argument('--match_ratio', required=False, type=float, default=0.1,
+                                        help='minimum match ratio between contigs [0.1]')
+    mT2T.add_argument('--r2_threshold', required=False, type=float, default=0.2,
+                      help='minimum R² value to consider alignment as collinear [0.2]')
     mT2T.add_argument('--min_contig_length', required=False, type=int, default=100000,
                                         help='minimum contig length [100000]')
-    mT2T.add_argument('--min_alginment_length', required=False, type=int, default=200,
-                                        help='minimum alginment length [200]')
+    mT2T.add_argument('--min_alignment_length', required=False, type=int, default=200,
+                                        help='minimum alignment length [200]')
+    mT2T.add_argument('--min_chr_length', required=False, type=int, default=10000000,
+                                        help='minimum chromosomes length [10000000]')
 
     # global
     parser.add_argument('--threads', required=False, type=int, default=1, help='number of threads [1]')
@@ -65,7 +74,7 @@ def main():
     os.makedirs(f'{cwd}/01.mT2T/02.distance', exist_ok=True)
     cal_distance(file_split_list, f'{cwd}/01.mT2T/02.distance', args)
 
-    ### pste3: contig pairs 进行比对, 得到 03.alignment/merge.fa
+    ### step3: contig pairs 进行比对, 得到 03.alignment/merge.fa
     os.makedirs(f'{cwd}/01.mT2T/03.alignment', exist_ok=True)
     contig_pair_aln(f'{cwd}/01.mT2T/02.distance/similar_contig_pairs.txt', f'{cwd}/01.mT2T/03.alignment', args)
 
