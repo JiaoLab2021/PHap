@@ -13,16 +13,16 @@ A haplotype-resolved and telomere-to-telomere genome assembly pipeline (PHap) ta
 ## System Requirements
 * All scripts and analyses were developed and tested on Linux operating system environment.
 * Several essential tools were required: 
-	* [hifiasm v0.19.8](https://github.com/chhylp123/hifiasm)
-	* [minimap2 v2.24-r1122](https://github.com/lh3/minimap2)
-	* [SAMtools v1.15.1](https://github.com/samtools/samtools)
-	* [BWA v0.7.17-r1198-dirty](https://github.com/lh3/bwa)
+	* [hifiasm](https://github.com/chhylp123/hifiasm)
+	* [minimap2](https://github.com/lh3/minimap2)
+	* [SAMtools](https://github.com/samtools/samtools)
+	* [BWA](https://github.com/lh3/bwa)
 	* [SeqKit2](https://github.com/shenwei356/seqkit)
-	* [HapHiC v1.0.5](https://github.com/zengxiaofei/HapHiC)
-	* [PanDepth v2.25](https://github.com/HuiyangYu/PanDepth)
-	* [Mash v2.3](https://github.com/marbl/Mash?tab=readme-ov-file)
-	* [TGS-GapCloser v1.2.1](https://github.com/BGI-Qingdao/TGS-GapCloser)
-	* [Winnowmap2 v2.03](https://github.com/marbl/Winnowmap)
+	* [HapHiC](https://github.com/zengxiaofei/HapHiC)
+	* [PanDepth](https://github.com/HuiyangYu/PanDepth)
+	* [Mash](https://github.com/marbl/Mash?tab=readme-ov-file)
+	* [TGS-GapCloser](https://github.com/BGI-Qingdao/TGS-GapCloser)
+	* [Winnowmap2](https://github.com/marbl/Winnowmap)
 	* [T2T-polish](https://github.com/arangrhie/T2T-Polish "")
 	* [Python 3.9.7](https://www.python.org/downloads/)
 
