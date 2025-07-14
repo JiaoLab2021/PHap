@@ -856,7 +856,8 @@ def main():
         os.makedirs(cluster_chr_dir, exist_ok=True)
         os.chdir(cluster_chr_dir)
         cmd = f'grep {chr} {cwd}/02.cluster/01.putg_vs_mT2T/corrected_allelic_table.txt > {chr}.corrected_allelic_table.txt'
-        subprocess.run(cmd, shell=True, check=True)
+        check_file_in_path(f'{chr}.corrected_allelic_table.txt', cmd)
+        # subprocess.run(cmd, shell=True, check=True)
         allelic_table_chr = f'{chr}.corrected_allelic_table.txt'
         cluster(file, args.full_links, args.flank, args.contig_type, allelic_table_chr, cluster_chr_dir)
         # cluster(args.p_utg, args.full_links, args.flank, args.contig_type, allelic_table_chr, cluster_chr_dir)

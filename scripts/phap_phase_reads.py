@@ -62,7 +62,7 @@ def main():
            f'--bam_hic {args.bam_hic} '
            f'--bam_ont {args.bam_ont} '
            f'--contig_type {args.contig_type} '
-           f'--group {cwd}/02.cluster/05.rescue/merge.group.reassignment.cluster.txt '
+           f'--group {cwd}/02.cluster/05.rescue/group.reassignment.cluster.txt '
            f'--hifi {args.hifi} '
            f'--ont {args.ont} '
            f'--ont_length {args.ont_length} '

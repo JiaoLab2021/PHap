@@ -443,7 +443,7 @@ def find_identity_contig_pair(file_paf):
 
 
 def remove_redundancy(merge_paf, wd, dic_contig, args):
-    def get_contig_pair(contig1, contig2, len1, len2, start1, start2):
+    def get_contig_pair(contig1, contig2, len1, len2):
         ''' contig pair based on contig length, Return (longer_contig, shorter_contig) '''
         if len1 > len2:
             return (contig1, contig2)
@@ -457,7 +457,7 @@ def remove_redundancy(merge_paf, wd, dic_contig, args):
         else:
             return (start2, start1)
 
-    def filter_paf(file_paf, file_paf_filter, length_alignment, length_query):
+    def filter_paf(file_paf, length_alignment, length_query):
         ''' filter PAF '''
         cigar_pattern = re.compile(r'(\d+)([A-Z])')
 
@@ -465,6 +465,8 @@ def remove_redundancy(merge_paf, wd, dic_contig, args):
         dic_paf_info = defaultdict(lambda: [0, 0, 0, 0, 0.00, 0.00])
         # Dictionary to store alignment coordinates for R² calculation
         coord_dict = defaultdict(list)
+        # Dictionary to store alignment coordinates in target sequence
+        alignment_position = defaultdict(list)
 
         # processed_contig_pair = set()
         for lines in open(file_paf, 'r'):
@@ -493,28 +495,35 @@ def remove_redundancy(merge_paf, wd, dic_contig, args):
             qname, tname = line[0], line[5]
             qlen, tlen = int(line[1]), int(line[6])
             qstart, tstart = int(line[2]), int(line[7])
+            qend, tend = int(line[3]), int(line[8])
 
-            contig_pair = get_contig_pair(qname, tname, qlen, tlen, qstart, tstart)     # contig_pair：（long contig, short contig）
+            contig_pair = get_contig_pair(qname, tname, qlen, tlen)     # contig_pair：（long contig, short contig）
 
-            if int(line[9]) > 5000:
+            if match_count > 5000:
+                # 关键修复：alignment 坐标必须为 longer contig 上的
+                if qlen > tlen:
+                    long_start, long_end, long_len = qstart, qend, qlen
+                else:
+                    long_start, long_end, long_len = tstart, tend, tlen
+                alignment_position[contig_pair].append((min(long_start, long_end), max(long_start, long_end), long_len))
+
                 coord_pair = get_contig_coord(qlen, tlen, qstart, tstart)
-
                 # Record coordinates for R² evaluation
                 coord_dict[contig_pair].append(coord_pair)
 
             dic_paf_info[contig_pair][0] = max(qlen, tlen)     # dic_paf_info: key: (long ctg, short ctg); value: [long len, short len, long match count, short match count, long match ratio, short match ratio]
             dic_paf_info[contig_pair][1] = min(qlen, tlen)
-
             dic_paf_info[contig_pair][2] += match_count
             dic_paf_info[contig_pair][3] += match_count
+
         for pair, values in dic_paf_info.items():
             values[4] = values[2] / values[0] if values[0] else 0.0
             values[5] = values[3] / values[1] if values[1] else 0.0
             # dic_paf_info[contig_pair][4] = dic_paf_info[contig_pair][2] / dic_paf_info[contig_pair][0]      # ctg1 match ratio / long conitg
             # dic_paf_info[contig_pair][5] = dic_paf_info[contig_pair][3] / dic_paf_info[contig_pair][1]      # ctg2 match ratio / short contig
-        return dic_paf_info, coord_dict
+        return dic_paf_info, coord_dict, alignment_position
 
-    def compute_r2(coord_dict, threshold=0.85):
+    def compute_r2(coord_dict, threshold):
         """Compute R² (collinearity) for each contig pair"""
         r2_flag = {}
         for pair, coords in coord_dict.items():
@@ -528,12 +537,29 @@ def remove_redundancy(merge_paf, wd, dic_contig, args):
             r2_flag[pair] = r_squared >= threshold
         return r2_flag
 
+    def is_contained(contig_pair, alns, tlen, margin_ratio=0.05, ratio_threshold=0.8):
+        """
+        判断一个 contig 是否被包含在另一个 contig 中。
+        - alns: [(qstart, qend), ...]
+        - tlen: target contig 长度
+        - margin_ratio: 边缘比例，如 0.05 表示前5%和后5%
+        - ratio_threshold: 比对落在内部的比例阈值
+        """
+        if not alns or tlen <= 0:
+            return False
+        margin = int(tlen * margin_ratio)
+        total = len(alns)
+        inside = sum(1 for start, end in alns if start > margin and end < tlen - margin)
+        # print(alns, inside / total)
+        a = (inside / total) >= ratio_threshold
+        print('is contained?', contig_pair, {inside/total}, a)
+        return (inside / total) >= ratio_threshold
+
     ### step1: parse PAF and calculate match ratios and coordinate data
     file_paf_filter = os.path.join(wd, 'merge.filter.paf')
-    dic_paf_info, coord_dict = filter_paf(merge_paf, file_paf_filter, args.min_alignment_length, args.min_contig_length)
+    dic_paf_info, coord_dict, aln_pos = filter_paf(merge_paf, args.min_alignment_length, args.min_contig_length)
 
     ### step2: compute collinearity (R²) for each contig pair
-    # r2_result = compute_r2(coord_dict, threshold=args.r2_threshold)
     r2_result = compute_r2(coord_dict, threshold=args.r2_threshold)
 
     ### step3: write debug info
@@ -542,23 +568,36 @@ def remove_redundancy(merge_paf, wd, dic_contig, args):
             r2_status = r2_result.get(key, False)
             str_values = "\t".join(map(str, values))
             f.write(f'{key[0]}\t{key[1]}\t{str_values}\tR2_pass={r2_status}\n')
-            # f.write(f'{key}"\t"{str_values}"\n"')
 
     ### step4: determine which contigs to remove
     remove_contig = set()
     # processed_contig = set()      # 存储处理过的 contig -- 目的：对于 contig1-contig2，如果 contig1 已经被移除，那么对于 contig1-contig3，contig3 较短，这时候按照规则需要去除 contig3，但是 contig1 已经去除，contig3 需要保留。
     for contig_pair, values in dic_paf_info.items():
-        match_ratio_pass = values[4] > args.match_ratio or values[5] > args.match_ratio
+        # match_ratio_pass = values[4] > args.match_ratio or values[5] > args.match_ratio
+        match_ratio_pass = values[4] > args.match_ratio_target and values[5] > args.match_ratio_query        # long contig and short contig 都超过阈值; 冗余比较多
         collinear_pass = r2_result.get(contig_pair, False)
+
+        alns_full = aln_pos.get(contig_pair, [])
+        if alns_full:
+            tlen = alns_full[0][2]
+            alns = [(s, e) for s, e, _ in alns_full]
+            contained_pass = is_contained(contig_pair, alns, tlen, margin_ratio=args.internal_margin_ratio,
+                                          ratio_threshold=args.internal_ratio_threshold)
+        else:
+            contained_pass = False
+
+        # if contig_pair[1] not in remove_contig:
+        #     if (match_ratio_pass and collinear_pass) or contained_pass:
+        #         remove_contig.add(contig_pair[1])
+
         if contig_pair[1] not in remove_contig:
-            if match_ratio_pass and collinear_pass:
-                contig_short = contig_pair[1]
-                remove_contig.add(contig_short)
+            # if (match_ratio_pass and collinear_pass) or (contained_pass and collinear_pass):
+            if (match_ratio_pass and contained_pass and collinear_pass):
+                remove_contig.add(contig_pair[1])
 
     ### Step 5: write output FASTA files
     with open(f'{wd}/removed.fa', 'w') as out_remove, open(f'{wd}/retained.fa', 'w') as out_retain:
         for id, seq in dic_contig.items():
-            # if len(seq) >= args.min_contig_length:
             if len(seq) >= args.min_chr_length:
                 output = out_remove if id in remove_contig else out_retain
                 output.write(f'>{id}\n{seq}\n')
