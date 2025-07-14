@@ -14,7 +14,8 @@ To do list:
 import argparse
 import os
 import pickle
-from util import *
+import pandas as pd
+# from util import *
 from collections import defaultdict
 
 
@@ -271,75 +272,6 @@ def run_reassignment(sorted_ctg_list, ctg_group_link_dict, ctg_group_dict, full_
 def assign_unitigs_by_density(sorted_ctg_list, ctg_group_dict, dic_contig_type, full_link_dict, RE_site_dict, group_RE_dict):
     ''' 分配 unitigs 到 groups，基于 Hi-C links density '''
 
-    list_unreassigned_unitig = []
-
-    ## 遍历 unitigs
-    for ctg, ctg_len in sorted_ctg_list:
-        # 存储每个 group 对每个 contig 的链接密度
-        group_density_dict = defaultdict(float)
-
-        # 跳过 grouped unitig
-        if ctg in ctg_group_dict.keys():
-            print(f'Debugs: {ctg} has grouped, pass!')
-            continue
-        print(f'Debugs: ctg ctg_len {ctg} {ctg_len}')
-
-        # 获得当前 unitig type
-        contig_type = dic_contig_type.get(ctg, 'haplotig')
-        num_groups_to_assign = {
-            'haplotig': 1,
-            'diplotig': 2,
-            'triplotig': 3,
-            'tetraplotig': 4
-        }.get(contig_type, 1)
-
-        links_list = []
-
-        # 计算与所有已分组 unitig 的 Hi-C links density
-        for (ctg1, ctg2), links in full_link_dict.items():
-            if ctg1 == ctg or ctg2 == ctg:
-                other_ctg = ctg2 if ctg1 == ctg else ctg1
-                if other_ctg in ctg_group_dict:
-                    for assigned_group in ctg_group_dict[other_ctg]:
-                        links_list.append(links)
-                        group_RE_sites = group_RE_dict[assigned_group]
-                        density = links / group_RE_sites if group_RE_sites else 0
-                        print(f'Debugs: new_unitig assigned_group density {ctg}-{assigned_group} {links} {group_RE_sites} {density}')
-                        group_density_dict[assigned_group] += density
-
-        if len(links_list) > 0 and max(links_list) < 5:     # 对 Hi-C links 数量进行过滤，如果 Hi-C links 的数量小于 5，那么可以认为是没有 Hi-C 信号的，考虑跳过。
-            list_unreassigned_unitig.append(ctg)
-            continue
-
-        # 选择链接密度最高的几个 group
-        sorted_groups_by_density = sorted(group_density_dict.items(), key=lambda x: x[1], reverse=True)
-        top_groups = [group for group, _ in sorted_groups_by_density[:num_groups_to_assign]]
-
-        if not top_groups:
-            list_unreassigned_unitig.append(ctg)
-            print(f'Debugs: No Hi-C signal, {ctg} has not been assigned to any group.')
-        else:
-            print(f'Debugs: top_groups sorted_groups_by_density {top_groups} {sorted_groups_by_density}')
-            # 分配到最适合的 group
-            ctg_group_dict[ctg] = set()
-            for group in top_groups:
-                ctg_group_dict[ctg].add(group)
-                print(f'Debugs: {ctg} reassigned to {group}')
-                # 更新 group 的酶切位点计数
-                group_RE_dict[group] += RE_site_dict[ctg]
-            # for group in top_groups:
-            #     if ctg not in ctg_group_dict:
-            #         ctg_group_dict[ctg] = set()
-            #     ctg_group_dict[ctg].add(group)  # 假设 ctg_group_dict[ctg] 是一个 set
-            #     print(f'Debugs: {ctg} reassigned to {group}')
-            #     更新 group 的酶切位点计数
-                # group_RE_dict[group] += RE_site_dict[ctg]  # 假设我们有每个 ctg 的 RE_sites_dict
-    return ctg_group_dict, list_unreassigned_unitig
-
-
-def assign_unitigs_by_density_v2(sorted_ctg_list, ctg_group_dict, dic_contig_type, full_link_dict, RE_site_dict, group_RE_dict):
-    ''' 分配 unitigs 到 groups，基于 Hi-C links density '''
-
     # 更改 new unitig Hi-C links 密度计算方式
 
     list_unreassigned_unitig = []
@@ -404,13 +336,6 @@ def assign_unitigs_by_density_v2(sorted_ctg_list, ctg_group_dict, dic_contig_typ
                 print(f'Debugs: {ctg} reassigned to {group}')
                 # 更新 group 的酶切位点计数
                 group_RE_dict[group] += RE_site_dict[ctg]
-            # for group in top_groups:
-            #     if ctg not in ctg_group_dict:
-            #         ctg_group_dict[ctg] = set()
-            #     ctg_group_dict[ctg].add(group)  # 假设 ctg_group_dict[ctg] 是一个 set
-            #     print(f'Debugs: {ctg} reassigned to {group}')
-            #     更新 group 的酶切位点计数
-                # group_RE_dict[group] += RE_site_dict[ctg]  # 假设我们有每个 ctg 的 RE_sites_dict
     return ctg_group_dict, list_unreassigned_unitig
 
 
@@ -544,46 +469,6 @@ def parse_arguments():
 def main():
     args = parse_arguments()
 
-
-    def reassign(fasta, contig_type, full_links, clusters_file, normalize_by_nlinks, clm_file):
-        ### step1: hi-c links density
-        ## fa dict
-        fa_dict = parse_fasta(fasta)
-
-        ## contig type
-        dic_contig_type = parse_contig_type(contig_type)
-        print(f'Debugs: dic_contig_type {dic_contig_type}')
-
-        ## RE site
-        full_link_dict, sorted_ctg_list, RE_site_dict = parse_pickle(fa_dict, full_links)
-        print(f'Debugs: full_link_dict {full_link_dict}')
-        print(f'Debugs: sorted_ctg_list {len(sorted_ctg_list)} {sorted_ctg_list}')
-        print(f'Debugs: RE_site_dict {RE_site_dict}')
-        out = open('full.links.txt', 'w')
-        for key, value in full_link_dict.items():
-            out.write(str(key) + '\t' + str(value) + '\n')
-        out.close()
-
-        ## parse_clusters
-        ctg_group_dict, group_RE_dict = parse_clusters(clusters_file, RE_site_dict)
-        print(f'Debugs: ctg_group_dict {ctg_group_dict} ')
-        print(f'Debugs: group_RE_dict {group_RE_dict}')
-
-        ## cal link density
-        ctg_group_link_dict, linked_ctg_dict = parse_link_dict(full_link_dict, ctg_group_dict,
-                                                               normalize_by_nlinks=normalize_by_nlinks)
-        print(f'Debugs ctg_group_link_dict {ctg_group_link_dict}')
-        print(f'Debugs link_dict {linked_ctg_dict}')
-
-        ctg_group_dict_new, list_unreassigned_unitig = assign_unitigs_by_density(sorted_ctg_list, ctg_group_dict,
-                                                                                 dic_contig_type, full_link_dict,
-                                                                                 RE_site_dict, group_RE_dict)
-        write_group_ids_and_sequences(ctg_group_dict_new, list_unreassigned_unitig, fa_dict, chr)
-
-        ## split clm
-        split_clm_file(clm_file, group_RE_dict, ctg_group_dict)
-
-
     ### step1: hi-c links density
     ## fa dict
     fa_dict = parse_fasta(args.fasta)
@@ -615,7 +500,7 @@ def main():
     print(f'Debugs ctg_group_link_dict {ctg_group_link_dict}')
     print(f'Debugs link_dict {linked_ctg_dict}')
 
-    ctg_group_dict_new, list_unreassigned_unitig = assign_unitigs_by_density_v2(sorted_ctg_list, ctg_group_dict, dic_contig_type, full_link_dict, RE_site_dict, group_RE_dict)
+    ctg_group_dict_new, list_unreassigned_unitig = assign_unitigs_by_density(sorted_ctg_list, ctg_group_dict, dic_contig_type, full_link_dict, RE_site_dict, group_RE_dict)
     write_group_ids_and_sequences(ctg_group_dict_new, list_unreassigned_unitig, fa_dict, chr)
 
     ## split clm

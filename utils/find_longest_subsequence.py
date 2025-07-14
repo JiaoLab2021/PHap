@@ -101,15 +101,13 @@ def read_paf(file_paf, min_align_length, min_unitig_length):
     return alignments
 
 
-# def find_best_reference_for_unitig(unitig_alignments):
-#     return max(unitig_alignments.keys(), key=lambda unitig_id: (len(unitig_alignments[unitig_id]), sum(int(aln[9]) for aln in unitig_alignments[unitig_id])))
 def find_best_reference_for_unitig(unitig_alignments, min_match_ratio, min_align_length, min_unitig_length, unitig_id):
     '''
-    找到 unitig 的最佳匹配参考序列，并计算出匹配比率
-    如果匹配比率低于阈值，则返回 None
+    找到 unitig 的最佳匹配参考序列，并计算匹配比率。
+    优先依据总匹配长度，再次依据对齐数量，确保选择具有最好整体对齐质量的 reference。
     '''
-    reference_stats = defaultdict(lambda: [0, 0])   # 每个 reference 的对齐数量和总匹配长度
-    unitig_len = int(unitig_alignments[0][1])       # unitig 的长度
+    reference_stats = defaultdict(lambda: [0, 0])  # 每个 reference 的 [对齐数量, 总匹配长度]
+    unitig_len = int(unitig_alignments[0][1])      # unitig 长度
 
     if unitig_len < min_unitig_length:
         return None, None
@@ -119,15 +117,26 @@ def find_best_reference_for_unitig(unitig_alignments, min_match_ratio, min_align
         if match_len < min_align_length:
             continue
         reference_id = alignment[5]
-        reference_stats[reference_id][0] += 1           # 记录对齐数量
-        reference_stats[reference_id][1] += match_len   # 记录总匹配长度
+        reference_stats[reference_id][0] += 1            # 对齐数量
+        reference_stats[reference_id][1] += match_len    # 总匹配长度
 
-    # 找到比对数量最多的参考序列，如果数量相同，则选择总比对长度最大的那个
-    best_reference = max(reference_stats.keys(), key=lambda ref: (reference_stats[ref][0], reference_stats[ref][1]))
+    if not reference_stats:
+        return None, None
+
+    # 找出总匹配长度最大的 reference
+    best_reference_length = max(reference_stats.keys(), key=lambda ref: reference_stats[ref][1])
+
+    # 找出对齐数量最多的 reference
+    best_reference_count = max(reference_stats.keys(), key=lambda ref: reference_stats[ref][0])
+
+    # 如果一致，直接返回
+    if best_reference_length == best_reference_count:
+        best_reference = best_reference_length
+    else:
+        # 否则优先选总匹配长度最大者
+        best_reference = best_reference_length
+
     match_ratio = reference_stats[best_reference][1] / unitig_len
-
-    if unitig_id == 'utg000211l':
-        print(f'Debugs: {match_ratio}')
 
     if match_ratio < min_match_ratio:
         return None, None
@@ -159,11 +168,8 @@ def find_lis_with_threshold(arr, min_distance):
 
     lis_segments.append(current_lis)
 
-    #
     lis_segments_sorted = sorted(lis_segments,
                                    key=lambda segment: int(segment[-1][7]) if segment and segment[-1] else 0)
-
-
     return lis_segments_sorted
 
 
@@ -351,12 +357,12 @@ def main():
         # print(f'Debugs: best_reference match_ratio {best_reference} {match_ratio}')
         if best_reference:
             filtered_alignments[unitig_id] = [aln for aln in alignments if aln[5] == best_reference]
-        if unitig_id == 'utg000211l':
-            print(f'utg000211l {best_reference} {match_ratio}')
-        if unitig_id == 'utg000613l':
-            print(f'utg000613l {best_reference} {match_ratio}')
-    if 'utg000211l' in filtered_alignments:
-        print(f'nihc utg000211l')
+    #     if unitig_id == 'utg000211l':
+    #         print(f'utg000211l {best_reference} {match_ratio}')
+    #     if unitig_id == 'utg000613l':
+    #         print(f'utg000613l {best_reference} {match_ratio}')
+    # if 'utg000211l' in filtered_alignments:
+    #     print(f'nihc utg000211l')
     print(f'Debugs: filtered_alignments {filtered_alignments}')
 
     ### step3: 寻找 unitig 的最佳 LIS

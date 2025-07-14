@@ -176,7 +176,7 @@ def parse_args():
     parser.add_argument('--bam_hic', type=str, required=True, help='Path to Hi-C bam file')
     parser.add_argument('--bam_ont', type=str, required=True, help='Path to ONT bam file')
     parser.add_argument('--contig_type', required=True, type=str, help='Path to contig type from dosage analysis')
-    parser.add_argument('--group', type=str, help='Path to merge group file from cluster, default is /02.cluster/05.rescue/merge.group.reassignment.cluster.txt')
+    parser.add_argument('--group', type=str, help='Path to merge group file from cluster, default is /02.cluster/05.rescue/group.reassignment.cluster.txt')
     parser.add_argument('--hifi', type=str, required=True, help='Path to HiFi reads file')
     parser.add_argument('--ont', type=str, required=True, help='Path to ONT reads file')
     parser.add_argument('--hic1', type=str, required=True, help='Path to Hi-C forward reads file')
@@ -294,8 +294,10 @@ def main():
     for group, reads in dic_group_hic.items():
         with open(f'{group}.Hi-C.1.txt', 'w') as f1:
             f1.write('/1\n'.join(reads) + '/1' + '\n')
+            # f1.write('\n'.join(reads) + '\n')  # for c88
         with open(f'{group}.Hi-C.2.txt', 'w') as f2:
             f2.write('/2\n'.join(reads) + '/2' + '\n')
+            # f2.write('\n'.join(reads) + '\n')  # for c88
         cmd1 = f'seqkit grep -j {args.threads} -f {group}.Hi-C.1.txt {args.hic1} > {group}.Hi-C.1.fq; pigz -p 5 {group}.Hi-C.1.fq'
         cmd2 = f'seqkit grep -j {args.threads} -f {group}.Hi-C.2.txt {args.hic2} > {group}.Hi-C.2.fq; pigz -p 5 {group}.Hi-C.2.fq'
         commands.append(cmd1)
