@@ -42,8 +42,8 @@ def parse_args():
                                         help='minimum match ratio between contigs [0.05]')
     mT2T.add_argument('--match_ratio_query', required=False, type=float, default=0.1,
                                         help='minimum match ratio between contigs [0.1]')
-    mT2T.add_argument('--r2_threshold', required=False, type=float, default=0.5,
-                      help='minimum R² value to consider alignment as collinear [0.5]')
+    mT2T.add_argument('--r2_threshold', required=False, type=float, default=0.2,
+                      help='minimum R² value to consider alignment as collinear [0.2]')
     mT2T.add_argument('--min_contig_length', required=False, type=int, default=100000,
                                         help='minimum contig length [100000]')
     mT2T.add_argument('--min_alignment_length', required=False, type=int, default=200,
@@ -54,6 +54,7 @@ def parse_args():
                         help='Proportional margin to define internal alignments (default: 0.05)')
     parser.add_argument('--internal_ratio_threshold', type=float, default=0.75,
                         help='Ratio of internal alignments to consider a contig contained (default: 0.75)')
+    parser.add_argument('--lis_cov', type=float, default=0.2, help='Minimum LIS coverage (default: 0.2)')
 
     # global
     parser.add_argument('--threads', required=False, type=int, default=1, help='number of threads [1]')
@@ -86,7 +87,7 @@ def main():
 
     ### step5: 去除冗余的 contig
     os.makedirs(f'{cwd}/01.mT2T/04.remove.redundancy', exist_ok=True)
-    remove_redundancy(f'{cwd}/01.mT2T/03.alignment/merge.paf', f'{cwd}/01.mT2T/04.remove.redundancy', dic_contig, args)
+    remove_redundancy_v2(f'{cwd}/01.mT2T/03.alignment/merge.paf', f'{cwd}/01.mT2T/04.remove.redundancy', dic_contig, args)
 
     # ### step6: 获得 consensus 序列
     # os.makedirs(f'{cwd}/01.mT2T/05.consensus', exist_ok=True)
