@@ -66,21 +66,21 @@ fi
 mkdir -p "$output_directory"
 
 # HiFi mapping to genome
-# minimap2 -ax map-hifi -t $threads -N 1 --secondary=no -o "$output_directory/aln.sam" $genome $hifi
+minimap2 -ax map-hifi -t $threads -N 1 --secondary=no -o "$output_directory/aln.sam" $genome $hifi
 
-# samtools view -@ $threads -bS "$output_directory/aln.sam" > "$output_directory/aln.bam"
-# rm "$output_directory/aln.sam"
+samtools view -@ $threads -bS "$output_directory/aln.sam" > "$output_directory/aln.bam"
+rm "$output_directory/aln.sam"
 
-# samtools sort -@ $threads -o "$output_directory/aln.sort.bam" "$output_directory/aln.bam"
-# rm "$output_directory/aln.bam"
+samtools sort -@ $threads -o "$output_directory/aln.sort.bam" "$output_directory/aln.bam"
+rm "$output_directory/aln.bam"
 
-# samtools view -h -@ $threads -F 3840 -bS "$output_directory/aln.sort.bam" | samtools sort -@ $threads -o "$output_directory/aln.sort.clean.bam" -
-# rm "$output_directory/aln.sort.bam"
+samtools view -h -@ $threads -F 3840 -bS "$output_directory/aln.sort.bam" | samtools sort -@ $threads -o "$output_directory/aln.sort.clean.bam" -
+rm "$output_directory/aln.sort.bam"
 
-# # 计算Depth，窗口设置为 10kb
-# nohup time -v pandepth -i "$output_directory/aln.sort.clean.bam" -w 10000 -a -o "$output_directory/aln.sort.clean.pandepth" -t $threads > "$output_directory/log_pandepth_out" 2> "$output_directory/log_pandepth_err"
+# 计算Depth，窗口设置为 10kb
+nohup time -v pandepth -i "$output_directory/aln.sort.clean.bam" -w 10000 -a -o "$output_directory/aln.sort.clean.pandepth" -t $threads > "$output_directory/log_pandepth_out" 2> "$output_directory/log_pandepth_err"
 
-# zcat "$output_directory/aln.sort.clean.pandepth.win.stat.gz" | grep -v RegionLength | cut -f 8 | sed 's/MeanDepth/Depth/g' > "$output_directory/dosage.win10000.txt"
+zcat "$output_directory/aln.sort.clean.pandepth.win.stat.gz" | grep -v RegionLength | cut -f 8 | sed 's/MeanDepth/Depth/g' > "$output_directory/dosage.win10000.txt"
 
 $rscript_path -i "$output_directory/dosage.win10000.txt" -o "$output_directory/dosage.win10000"
 
