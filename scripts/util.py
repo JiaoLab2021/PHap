@@ -411,7 +411,8 @@ def contig_pair_aln(file_similar_contig_pairs, wd, args):
                 commands.append(cmd_minimap2)
         run_in_parallel(commands, args.process)
         ## merge paf
-        subprocess.run(f'cat {wd}/*.paf > {wd}/merge.paf', shell=True, close_fds=True)
+        # subprocess.run(f'cat {wd}/*.paf > {wd}/merge.paf', shell=True, close_fds=True)    # Too many files will cause an error
+        subprocess.run(f'find {wd}/*.paf -name "*.paf" -print0 | xargs -0 cat > {wd}/merge.paf')
 
 
 def find_identity_contig_pair(file_paf):
